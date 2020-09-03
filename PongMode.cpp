@@ -7,6 +7,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <random>
+#include <iostream>
 
 PongMode::PongMode() {
 
@@ -128,6 +129,61 @@ bool PongMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 		left_paddle.y = (clip_to_court * glm::vec3(clip_mouse, 1.0f)).y;
 	}
 
+
+	int x_vel = 0;
+	int y_vel = 0;
+
+	// keyboard, based on https://www.libsdl.org/release/SDL-1.2.15/docs/html/guideinputkeyboard.html
+	switch (evt.type)
+	{
+	case SDL_KEYDOWN:
+		switch (evt.key.keysym.sym)
+		{
+		case (SDLK_LEFT):
+			x_vel = -1;
+			break;
+		case (SDLK_RIGHT):
+			x_vel = 1;
+			break;
+		case (SDLK_UP):
+			y_vel = -1;
+			break;
+		case (SDLK_DOWN):
+			y_vel = 1;
+			break;
+		}
+		break; 
+	case SDL_KEYUP:
+		switch (evt.key.keysym.sym)
+		{
+		case (SDLK_LEFT):
+			if (x_vel < 0)
+			{
+				x_vel = 0;
+			}
+			break;
+		case (SDLK_RIGHT):
+			if (x_vel > 0)
+			{
+				x_vel = 0;
+			}
+			break;
+		case (SDLK_UP):
+			if (y_vel < 0)
+			{
+				y_vel = 0;
+			}
+			break;
+		case (SDLK_DOWN):
+			if (y_vel > 0)
+			{
+				y_vel = 0;
+			}
+			break;
+		}
+		break;
+	}
+	
 	return false;
 }
 
