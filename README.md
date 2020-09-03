@@ -1,8 +1,8 @@
-# (TODO: your game's title)
+# Robot Conveyor
 
-Author: (TODO: your name)
+Author: Haidar Jamal
 
-Design: (TODO: In two sentences or fewer, describe what is new and interesting about your game.)
+Design: You have to run a factory. How hard should you make your worker work? Gotta love capitalism.
 
 Screen Shot:
 
