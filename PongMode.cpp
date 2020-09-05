@@ -130,26 +130,29 @@ bool PongMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 	}
 
 
-	int x_vel = 0;
-	int y_vel = 0;
-
 	// keyboard, based on https://www.libsdl.org/release/SDL-1.2.15/docs/html/guideinputkeyboard.html
 	switch (evt.type)
 	{
 	case SDL_KEYDOWN:
 		switch (evt.key.keysym.sym)
 		{
+		case (SDLK_SPACE):
+			if (abs(robot.x - box.x) < 0.4 && abs(robot.y - box.y) < 0.4)
+			{
+				draw_box = false;
+			}
+			break;
 		case (SDLK_LEFT):
-			x_vel = -1;
+			robot_velocity.x = -1;
 			break;
 		case (SDLK_RIGHT):
-			x_vel = 1;
+			robot_velocity.x = 1;
 			break;
 		case (SDLK_UP):
-			y_vel = -1;
+			robot_velocity.y = 1;
 			break;
 		case (SDLK_DOWN):
-			y_vel = 1;
+			robot_velocity.y = -1;
 			break;
 		}
 		break; 
@@ -157,33 +160,38 @@ bool PongMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 		switch (evt.key.keysym.sym)
 		{
 		case (SDLK_LEFT):
-			if (x_vel < 0)
+			if (robot_velocity.x < 0)
 			{
-				x_vel = 0;
+				robot_velocity.x = 0;
 			}
 			break;
 		case (SDLK_RIGHT):
-			if (x_vel > 0)
+			if (robot_velocity.x > 0)
 			{
-				x_vel = 0;
+				robot_velocity.x = 0;
 			}
 			break;
 		case (SDLK_UP):
-			if (y_vel < 0)
+			if (robot_velocity.y > 0)
 			{
-				y_vel = 0;
+				robot_velocity.y = 0;
 			}
 			break;
 		case (SDLK_DOWN):
-			if (y_vel > 0)
+			if (robot_velocity.y < 0)
 			{
-				y_vel = 0;
+				robot_velocity.y = 0;
 			}
 			break;
 		}
 		break;
 	}
-	
+	// normalize diag
+	if (robot_velocity.x != 0 && robot_velocity.y != 0)
+	{
+		robot_velocity.x /= abs(robot_velocity.x)* sqrt(2.0f);
+		robot_velocity.y /= abs(robot_velocity.y)* sqrt(2.0f);
+	}
 	return false;
 }
 
@@ -201,9 +209,9 @@ void PongMode::update(float elapsed) {
 			ai_offset = (mt() / float(mt.max())) * 2.5f - 1.25f;
 		}
 		if (right_paddle.y < ball.y + ai_offset) {
-			right_paddle.y = std::min(ball.y + ai_offset, right_paddle.y + 2.0f * elapsed);
+			right_paddle.y = std::min(ball.y + ai_offset, right_paddle.y + 4.0f * elapsed);
 		} else {
-			right_paddle.y = std::max(ball.y + ai_offset, right_paddle.y - 2.0f * elapsed);
+			right_paddle.y = std::max(ball.y + ai_offset, right_paddle.y - 4.0f * elapsed);
 		}
 	}
 
@@ -223,6 +231,9 @@ void PongMode::update(float elapsed) {
 	speed_multiplier = std::min(speed_multiplier, 10.0f);
 
 	ball += elapsed * speed_multiplier * ball_velocity;
+
+	// robot update
+	robot += elapsed * robot_velocity;
 
 	//---- collision handling ----
 
@@ -274,7 +285,6 @@ void PongMode::update(float elapsed) {
 			ball_velocity.y = -ball_velocity.y;
 		}
 	}
-
 	if (ball.x > court_radius.x - ball_radius.x) {
 		ball.x = court_radius.x - ball_radius.x;
 		if (ball_velocity.x > 0.0f) {
@@ -288,6 +298,19 @@ void PongMode::update(float elapsed) {
 			ball_velocity.x = -ball_velocity.x;
 			right_score += 1;
 		}
+	}
+
+	if (robot.y > court_radius.y - robot_radius.y) {
+		robot.y = court_radius.y - robot_radius.y;
+	}
+	if (robot.y < -court_radius.y + robot_radius.y) {
+		robot.y = -court_radius.y + robot_radius.y;
+	}
+	if (robot.x > court_radius.x - robot_radius.x) {
+		robot.x = court_radius.x - robot_radius.x;
+	}
+	if (robot.x < -court_radius.x + robot_radius.x) {
+		robot.x = -court_radius.x + robot_radius.x;
 	}
 
 	//----- rainbow trails -----
@@ -357,6 +380,7 @@ void PongMode::draw(glm::uvec2 const &drawable_size) {
 	draw_rectangle(left_paddle+s, paddle_radius, shadow_color);
 	draw_rectangle(right_paddle+s, paddle_radius, shadow_color);
 	draw_rectangle(ball+s, ball_radius, shadow_color);
+	draw_rectangle(robot+s, robot_radius, shadow_color); //
 
 	//ball's trail:
 	if (ball_trail.size() >= 2) {
@@ -394,6 +418,15 @@ void PongMode::draw(glm::uvec2 const &drawable_size) {
 
 	//ball:
 	draw_rectangle(ball, ball_radius, fg_color);
+
+	//robot:
+	draw_rectangle(robot, robot_radius, fg_color); 
+
+	// box
+	if (draw_box)
+	{
+		draw_rectangle(box, robot_radius, fg_color);
+	}
 
 	//scores:
 	glm::vec2 score_radius = glm::vec2(0.1f, 0.1f);
