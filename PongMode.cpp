@@ -137,9 +137,44 @@ bool PongMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 		switch (evt.key.keysym.sym)
 		{
 		case (SDLK_SPACE):
-			if (abs(robot.x - box.x) < 0.4 && abs(robot.y - box.y) < 0.4)
+			if (!robot_has_box)
 			{
-				draw_box = false;
+				// check if robot near box
+				for (auto it = boxes.begin(); it != boxes.end();) {
+					if (abs(robot.x - (*it).x) < 1 && abs(robot.y - (*it).y) < 1)
+					{
+						carried_box_color = (int)(*it).z;
+						it = boxes.erase(it);
+						robot_has_box = true;
+						// change robot color here maybe
+						printf("Picked up box!\n");
+						break;
+					}
+					else
+					{
+						++it;
+					}
+				}
+			}
+			else
+			{
+				for (const auto & bucket : buckets)
+				{
+					// check if robot in bucket
+					if (robot.x > bucket.x - bucket_radius.x && robot.x < bucket.x + bucket_radius.x
+						&& robot.y > bucket.y - bucket_radius.y && robot.y < bucket.y + bucket_radius.y)
+					{
+						if ((int)bucket.z == carried_box_color)
+						{
+							printf("Dropped box into bucket! Good robot! \n");
+							robot_has_box = false;
+						}
+						else
+						{
+							printf("Wrong colored box. Bad robot. \n");
+						}
+					}
+				}
 			}
 			break;
 		case (SDLK_LEFT):
@@ -196,7 +231,7 @@ bool PongMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 }
 
 void PongMode::update(float elapsed) {
-
+	
 	static std::mt19937 mt; //mersenne twister pseudo-random number generator
 
 	//----- paddle update -----
@@ -229,11 +264,27 @@ void PongMode::update(float elapsed) {
 
 	//velocity cap, though (otherwise ball can pass through paddles):
 	speed_multiplier = std::min(speed_multiplier, 10.0f);
-
 	ball += elapsed * speed_multiplier * ball_velocity;
 
 	// robot update
-	robot += elapsed * robot_velocity;
+	robot += elapsed * robot_velocity * robot_speed;
+
+	// boxes update
+	for (auto & box : boxes)
+	{
+		box.y -= elapsed*conveyor_speed;
+	}
+	// remove box if reaches hole
+	if (!boxes.empty())
+	{
+		if (boxes.front().y + box_radius.y < conveyor_hole.y + conveyor_hole_radius.y)
+		{
+			boxes.erase(boxes.begin());
+		}
+	}
+
+	// only check the first box to see if it has reached the hole
+
 
 	//---- collision handling ----
 
@@ -300,6 +351,7 @@ void PongMode::update(float elapsed) {
 		}
 	}
 
+	// robot leaving map
 	if (robot.y > court_radius.y - robot_radius.y) {
 		robot.y = court_radius.y - robot_radius.y;
 	}
@@ -311,6 +363,18 @@ void PongMode::update(float elapsed) {
 	}
 	if (robot.x < -court_radius.x + robot_radius.x) {
 		robot.x = -court_radius.x + robot_radius.x;
+	}
+	// robot hitting conveyor
+	if (robot.x < conveyor.x + conveyor_radius.x + robot_radius.x) {
+		robot.x = conveyor.x + conveyor_radius.x + robot_radius.x;
+	}
+
+	// generate new box
+	new_box_update -= elapsed;
+	if (new_box_update < 0)
+	{
+		boxes.push_back(glm::vec3(-court_radius.x + conveyor_radius.x + conveyor_offset, court_radius.y, rand()%3));
+		new_box_update = 1.0f + 1.0f*(float)rand() / RAND_MAX;
 	}
 
 	//----- rainbow trails -----
@@ -335,6 +399,14 @@ void PongMode::draw(glm::uvec2 const &drawable_size) {
 	const glm::u8vec4 bg_color = HEX_TO_U8VEC4(0x171714ff);
 	const glm::u8vec4 fg_color = HEX_TO_U8VEC4(0xd1bb54ff);
 	const glm::u8vec4 shadow_color = HEX_TO_U8VEC4(0x604d29ff);
+
+	// my colors
+	const std::vector<glm::u8vec4> game_colors = {HEX_TO_U8VEC4(0xee1c1cff),
+		HEX_TO_U8VEC4(0x004dffff), HEX_TO_U8VEC4(0x42ff00ff)};
+	const glm::u8vec4 box_color = HEX_TO_U8VEC4(0xee1c1cff);
+	const glm::u8vec4 conveyor_color = HEX_TO_U8VEC4(0x3c3c3cff);
+	const glm::u8vec4 conveyor_hole_color = HEX_TO_U8VEC4(0x000000ff);
+
 	const std::vector< glm::u8vec4 > rainbow_colors = {
 		HEX_TO_U8VEC4(0x604d29ff), HEX_TO_U8VEC4(0x624f29fc), HEX_TO_U8VEC4(0x69542df2),
 		HEX_TO_U8VEC4(0x6a552df1), HEX_TO_U8VEC4(0x6b562ef0), HEX_TO_U8VEC4(0x6b562ef0),
@@ -382,26 +454,26 @@ void PongMode::draw(glm::uvec2 const &drawable_size) {
 	draw_rectangle(ball+s, ball_radius, shadow_color);
 	draw_rectangle(robot+s, robot_radius, shadow_color); //
 
-	//ball's trail:
-	if (ball_trail.size() >= 2) {
-		//start ti at second element so there is always something before it to interpolate from:
-		std::deque< glm::vec3 >::iterator ti = ball_trail.begin() + 1;
-		//draw trail from oldest-to-newest:
-		for (uint32_t i = uint32_t(rainbow_colors.size())-1; i < rainbow_colors.size(); --i) {
-			//time at which to draw the trail element:
-			float t = (i + 1) / float(rainbow_colors.size()) * trail_length;
-			//advance ti until 'just before' t:
-			while (ti != ball_trail.end() && ti->z > t) ++ti;
-			//if we ran out of tail, stop drawing:
-			if (ti == ball_trail.end()) break;
-			//interpolate between previous and current trail point to the correct time:
-			glm::vec3 a = *(ti-1);
-			glm::vec3 b = *(ti);
-			glm::vec2 at = (t - a.z) / (b.z - a.z) * (glm::vec2(b) - glm::vec2(a)) + glm::vec2(a);
-			//draw:
-			draw_rectangle(at, ball_radius, rainbow_colors[i]);
-		}
-	}
+	////ball's trail:
+	//if (ball_trail.size() >= 2) {
+	//	//start ti at second element so there is always something before it to interpolate from:
+	//	std::deque< glm::vec3 >::iterator ti = ball_trail.begin() + 1;
+	//	//draw trail from oldest-to-newest:
+	//	for (uint32_t i = uint32_t(rainbow_colors.size())-1; i < rainbow_colors.size(); --i) {
+	//		//time at which to draw the trail element:
+	//		float t = (i + 1) / float(rainbow_colors.size()) * trail_length;
+	//		//advance ti until 'just before' t:
+	//		while (ti != ball_trail.end() && ti->z > t) ++ti;
+	//		//if we ran out of tail, stop drawing:
+	//		if (ti == ball_trail.end()) break;
+	//		//interpolate between previous and current trail point to the correct time:
+	//		glm::vec3 a = *(ti-1);
+	//		glm::vec3 b = *(ti);
+	//		glm::vec2 at = (t - a.z) / (b.z - a.z) * (glm::vec2(b) - glm::vec2(a)) + glm::vec2(a);
+	//		//draw:
+	//		draw_rectangle(at, ball_radius, rainbow_colors[i]);
+	//	}
+	//}
 
 	//solid objects:
 
@@ -415,17 +487,37 @@ void PongMode::draw(glm::uvec2 const &drawable_size) {
 	draw_rectangle(left_paddle, paddle_radius, fg_color);
 	draw_rectangle(right_paddle, paddle_radius, fg_color);
 	
+	//conveyor:
+	draw_rectangle(conveyor, conveyor_radius, conveyor_color);
+	
+	// conveyor hole:
+	draw_rectangle(conveyor_hole, conveyor_hole_radius, conveyor_hole_color);
 
 	//ball:
 	draw_rectangle(ball, ball_radius, fg_color);
 
-	//robot:
-	draw_rectangle(robot, robot_radius, fg_color); 
 
-	// box
-	if (draw_box)
+	// boxes
+	for (auto & box : boxes)
 	{
-		draw_rectangle(box, robot_radius, fg_color);
+		draw_rectangle(box, box_radius, game_colors[(int)box.z]);
+	}
+	
+	// buckets
+	for (auto & bucket : buckets)
+	{
+		draw_rectangle(bucket, bucket_radius, game_colors[(int)bucket.z]);
+	}
+
+	//robot:
+	if (robot_has_box)
+	{
+		draw_rectangle(robot, robot_radius, fg_color);
+		draw_rectangle(robot, box_radius, game_colors[carried_box_color]);
+	}
+	else
+	{
+		draw_rectangle(robot, robot_radius, fg_color);
 	}
 
 	//scores:
@@ -436,8 +528,6 @@ void PongMode::draw(glm::uvec2 const &drawable_size) {
 	for (uint32_t i = 0; i < right_score; ++i) {
 		draw_rectangle(glm::vec2( court_radius.x - (2.0f + 3.0f * i) * score_radius.x, court_radius.y + 2.0f * wall_radius + 2.0f * score_radius.y), score_radius, fg_color);
 	}
-
-
 
 	//------ compute court-to-window transform ------
 

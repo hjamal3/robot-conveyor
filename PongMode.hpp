@@ -42,14 +42,29 @@ struct PongMode : Mode {
 
 	// ******** My definitions ********* // 
 	glm::vec2 robot = glm::vec2(0.0f, 0.0f);
-	glm::vec2 robot_radius = glm::vec2(0.1f, 0.1f);
 	glm::vec2 robot_velocity = glm::vec2(0.0f, 0.0f);
+	const glm::vec2 robot_radius = glm::vec2(0.2f, 0.2f);
+	const float robot_speed = 4;
+	bool robot_has_box = false; // is the robot carrying a box?
+	int carried_box_color = 0; // color of the box the robot is carrying
 
-	glm::vec2 box = glm::vec2(-1.0f, 0.0f);
-	std::vector< glm::vec2> boxes;
-	bool draw_box = true;
+	const glm::vec2 conveyor_radius = glm::vec2(0.5f, court_radius.y);
+	const float conveyor_offset = 1.0f;
+	const glm::vec2 conveyor = glm::vec2(-court_radius.x + conveyor_radius.x + conveyor_offset, 0.0f);
+	const float conveyor_speed = 2.0f;
+	const glm::vec2 conveyor_hole_radius = glm::vec2(0.3f, 0.3f);
+	const glm::vec2 conveyor_hole = glm::vec2(-court_radius.x + conveyor_radius.x + conveyor_offset, -court_radius.y + conveyor_offset);
 
-	// ******** My definitions ********* // 
+	const glm::vec2 box_radius = glm::vec2(0.1f, 0.1f);
+	std::vector< glm::vec3> boxes = { glm::vec3(-court_radius.x+conveyor_radius.x+conveyor_offset, court_radius.y,0)};
+	
+	const std::vector<glm::vec3> buckets = { glm::vec3(court_radius.x - 3.0f, 0.0f,0) ,
+		glm::vec3(court_radius.x - 3.0f, 3.0f,1),  glm::vec3(court_radius.x - 3.0f, -3.0f,2) };
+	const glm::vec2 bucket_radius = glm::vec2(0.5f, 0.5f);
+
+	float new_box_update = 1.0f;
+
+	// ********************************* // 
 
 	//----- pretty rainbow trails -----
 
