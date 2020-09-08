@@ -6,7 +6,7 @@ Design: You are a warehouse robot. You have to pick up different items from a co
 
 Screen Shot:
 
-![Screen Shot](screenshot.png)
+![Screen Shot](screenshot2.png)
 
 How To Play:
 Arrow keys to move the robot around. Space bar to pick up a box from the belt. Space bar to drop the box into a bucket.
