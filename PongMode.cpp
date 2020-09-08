@@ -8,6 +8,7 @@
 
 #include <random>
 #include <iostream>
+#include <algorithm>
 
 PongMode::PongMode() {
 	
@@ -150,12 +151,32 @@ bool PongMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 					{
 						if ((int)bucket.z == carried_box_color)
 						{
-							printf("Dropped box into bucket! Good robot! \n");
 							robot_has_box = false;
+							switch ((int)bucket.z)
+							{
+							case 0: // red 
+								printf("Operator: Faulty part removed from assembly. Good robot! \n");
+								health++;
+								break;
+							case 1: // blue
+								printf("Operator: Picked up boost! Speedup for %d seconds! \n", (int)boost_period);
+								has_boost = true;
+								boost_time = boost_period; // reset
+								break;
+							case 2: // green
+								points++;
+								printf("Operator: Delivery made. \n");
+								if (points == max_points)
+								{
+									printf("Operator: YOU WIN!!!! You reached your daily quota! \n");
+									game_over = true;
+								}
+								break;
+							}
 						}
 						else
 						{
-							printf("Wrong colored box. Bad robot. \n");
+							printf("BOSS: Wrong colored box. Bad robot. \n");
 						}
 					}
 				}
@@ -215,21 +236,61 @@ bool PongMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 }
 
 void PongMode::update(float elapsed) {
-	
+	if (game_over)
+	{
+		return;
+	}
 	// robot update
-	robot += elapsed * robot_velocity * robot_speed;
+	if (has_boost)
+	{
+		robot += elapsed * robot_velocity * robot_speed * 1.5f;
+	}
+	else
+	{
+		robot += elapsed * robot_velocity * robot_speed;
+	}
+
 
 	// boxes update
 	for (auto & box : boxes)
 	{
-		box.y -= elapsed*conveyor_speed;
+		if (conveyor_speedup)
+		{
+			box.y -= elapsed * conveyor_speed * 2.0f;
+		}
+		else
+		{
+			box.y -= elapsed * conveyor_speed;
+		}
 	}
 	// remove box if reaches hole
 	if (!boxes.empty())
 	{
 		if (boxes.front().y + box_radius.y < conveyor_hole.y + conveyor_hole_radius.y)
 		{
+			if (boxes.front().z == 0) // red box
+			{
+				health = std::max(--health, 0);
+				printf("BOSS: Faulty part shipped! Bad robot! \n");
+				if (health == 0)
+				{
+					printf("BOSS:: CUSTOMERS ENRAGED! YOU'RE FIRED! GAME OVER. \n");
+					game_over = true;
+				}
+			}
+			else if (boxes.front().z == 1)
+			{
+				printf("BOSS: Oh so you don't need the boost? So you can do more work for 2 seconds. \n");
+				conveyor_speedup = true;
+				conveyor_speedup_time = conveyor_speedup_period;
+			}
+			else
+			{
+				points = std::max(--points, 0);
+				printf("BOSS: Missed an order. Bad robot. \n"); 
+			}
 			boxes.erase(boxes.begin());
+
 		}
 	}
 
@@ -253,22 +314,47 @@ void PongMode::update(float elapsed) {
 
 	// generate new box
 	new_box_update -= elapsed;
-	if (new_box_update < 0)
+	if (new_box_update <= 0)
 	{
 		boxes.push_back(glm::vec3(-court_radius.x + conveyor_radius.x + conveyor_offset, court_radius.y, rand()%3));
 		new_box_update = 1.0f + 1.0f*(float)rand() / RAND_MAX;
 	}
 
+	// boost speed
+	if (has_boost)
+	{
+		boost_time -= elapsed;
+		if (boost_time <= 0)
+		{
+			printf("Tech support: Boost period over. \n");
+			has_boost = false;
+		}
+	}
+
+	// conveyor speedup
+	if (conveyor_speedup)
+	{
+		conveyor_speedup_time -= elapsed;
+		if (conveyor_speedup_time <= 0)
+		{
+			conveyor_speedup = false;
+		}
+	}
+
 }
 
 void PongMode::draw(glm::uvec2 const &drawable_size) {
+	if (game_over)
+	{
+		return;
+	}
 	//some nice colors from the course web page:
 	#define HEX_TO_U8VEC4( HX ) (glm::u8vec4( (HX >> 24) & 0xff, (HX >> 16) & 0xff, (HX >> 8) & 0xff, (HX) & 0xff ))
 	const glm::u8vec4 bg_color = HEX_TO_U8VEC4(0x171714ff);
 	const glm::u8vec4 fg_color = HEX_TO_U8VEC4(0xd1bb54ff);
 	const glm::u8vec4 shadow_color = HEX_TO_U8VEC4(0x604d29ff);
 
-	// my colors
+	// my colors: red blue green!
 	const std::vector<glm::u8vec4> game_colors = {HEX_TO_U8VEC4(0xee1c1cff),
 		HEX_TO_U8VEC4(0x004dffff), HEX_TO_U8VEC4(0x42ff00ff)};
 	const glm::u8vec4 box_color = HEX_TO_U8VEC4(0xee1c1cff);
@@ -360,11 +446,11 @@ void PongMode::draw(glm::uvec2 const &drawable_size) {
 
 	//scores:
 	glm::vec2 score_radius = glm::vec2(0.1f, 0.1f);
-	for (uint32_t i = 0; i < left_score; ++i) {
-		draw_rectangle(glm::vec2( -court_radius.x + (2.0f + 3.0f * i) * score_radius.x, court_radius.y + 2.0f * wall_radius + 2.0f * score_radius.y), score_radius, fg_color);
+	for (int i = 0; i < health; ++i) {
+		draw_rectangle(glm::vec2( -court_radius.x + (2.0f + 3.0f * i) * score_radius.x, court_radius.y + 2.0f * wall_radius + 2.0f * score_radius.y), score_radius, game_colors[0]);
 	}
-	for (uint32_t i = 0; i < right_score; ++i) {
-		draw_rectangle(glm::vec2( court_radius.x - (2.0f + 3.0f * i) * score_radius.x, court_radius.y + 2.0f * wall_radius + 2.0f * score_radius.y), score_radius, fg_color);
+	for (int i = 0; i < points; ++i) {
+		draw_rectangle(glm::vec2( court_radius.x - (2.0f + 3.0f * i) * score_radius.x, court_radius.y + 2.0f * wall_radius + 2.0f * score_radius.y), score_radius, game_colors[2]);
 	}
 
 	//------ compute court-to-window transform ------

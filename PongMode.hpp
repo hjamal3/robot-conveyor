@@ -24,14 +24,16 @@ struct PongMode : Mode {
 	//----- game state -----
 
 	glm::vec2 court_radius = glm::vec2(7.0f, 5.0f);
-	uint32_t left_score = 0;
-	uint32_t right_score = 0;
+	const int max_points = 5;
+	int health = max_points;
+	int points = 0;
+	bool game_over = false;
 
 	// ******** My definitions ********* // 
 	glm::vec2 robot = glm::vec2(0.0f, 0.0f);
 	glm::vec2 robot_velocity = glm::vec2(0.0f, 0.0f);
 	const glm::vec2 robot_radius = glm::vec2(0.2f, 0.2f);
-	const float robot_speed = 4;
+	const float robot_speed = 8	;
 	bool robot_has_box = false; // is the robot carrying a box?
 	int carried_box_color = 0; // color of the box the robot is carrying
 
@@ -45,6 +47,12 @@ struct PongMode : Mode {
 	const glm::vec2 box_radius = glm::vec2(0.1f, 0.1f);
 	std::vector< glm::vec3> boxes = { glm::vec3(-court_radius.x+conveyor_radius.x+conveyor_offset, court_radius.y,0)};
 	float new_box_update = 1.0f;
+	const float boost_period = 5.0f;
+	float boost_time = 5.0f;
+	bool has_boost = false;
+	const float conveyor_speedup_period = 2.0f;
+	float conveyor_speedup_time = 2.0f;
+	bool conveyor_speedup = false;
 
 	const std::vector<glm::vec3> buckets = { glm::vec3(court_radius.x - 3.0f, 0.0f,0) ,
 		glm::vec3(court_radius.x - 3.0f, 3.0f,1),  glm::vec3(court_radius.x - 3.0f, -3.0f,2) };
